@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<classpath>
+	<classpathentry kind="src" path="src"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-1.6"/>
+	<classpathentry kind="lib" path="lib/htmlcleaner-2.2.jar" sourcepath="/home/wks/java_packages/HtmlCleaner/src/main/java">
+		<attributes>
+			<attribute name="javadoc_location" value="file:/home/wks/java_packages/HtmlCleaner/target/site/apidocs"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="lib" path="lib/commons-io-2.0.1.jar" sourcepath="/home/wks/java_packages/commons-io-2.0.1/commons-io-2.0.1-sources.jar">
+		<attributes>
+			<attribute name="javadoc_location" value="jar:file:/home/wks/java_packages/commons-io-2.0.1/commons-io-2.0.1-javadoc.jar!/"/>
+		</attributes>
+	</classpathentry>
+	<classpathentry kind="output" path="bin"/>
+</classpath>
