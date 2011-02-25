@@ -6,6 +6,7 @@ import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.GregorianCalendar;
+import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -112,8 +113,24 @@ public class Byr {
 		}
 	}
 
+	static final XPath MAX_PAGE_NUM = mkXPath("(//ol[@class='page-main'])[1]/li//text()");
+
+	private static int selectMaxPageNum(Document doc) throws JaxenException {
+		int mpn = -1;
+		for (Object obj : MAX_PAGE_NUM.selectNodes(doc)) {
+			try {
+				int pn = Integer.parseInt(toStr(obj));
+				if (pn > mpn) {
+					mpn = pn;
+				}
+			} catch (NumberFormatException e) {
+				// IGNORE "<<" and ">>"
+			}
+		}
+		return mpn;
+	}
+
 	static final XPath BOARD_PAGE__BOARD_MASTERS = mkXPath("//div[@class='b-head corner']/div/a/text()");
-	static final XPath BOARD_PAGE__MAX_PAGE_NUM = mkXPath("(//ol[@class='page-main'])[1]/li[last()-1]//text()");
 	static final XPath BOARD_PAGE__THREAD_ROWS = mkXPath("//table[@class='board-list tiz']//tr");
 
 	static final XPath THREAD_ROW__TITLE = mkXPath("td[@class='title_9']/a/text()");
@@ -141,9 +158,8 @@ public class Byr {
 				boardPage.getBoardMasters().add(toStr(bm));
 			}
 
-			boardPage.setMaxPageNum(BOARD_PAGE__MAX_PAGE_NUM.numberValueOf(doc)
-					.intValue());
-			
+			boardPage.setMaxPageNum(selectMaxPageNum(doc));
+
 			Date serverTime = selectServerTime(doc);
 
 			for (Object tr : BOARD_PAGE__THREAD_ROWS.selectNodes(doc)) {
@@ -171,5 +187,120 @@ public class Byr {
 			throw new ByrException("Error getting board:" + boardName, e);
 		}
 	}
-	
+
+	static final XPath THREAD_PAGE__POST_ROWS = mkXPath("//table[@class='article']");
+	static final XPath POST_ROW__AUTHOR = mkXPath(".//span[@class='u-name']/a/text()");
+	static final XPath POST_ROW__REPLY_URL = mkXPath(".//li[@class='a-reply']/a/@href");
+	static final XPath POST_ROW__CONTENT = mkXPath(".//td/p/node()");
+
+	static final char NBSP = '\u00a0';
+
+	static final Pattern POST_ROW__TITLE = Pattern.compile("标\\s+题:(.*)\n");
+	static final Pattern POST_ROW__DATE = Pattern
+			.compile("\\w+\\s+(\\w+\\s+\\d+\\s+\\d+:\\d+:\\d+\\s+\\d+)");
+	static final SimpleDateFormat POST_ROW__DATE_FORMAT = new SimpleDateFormat(
+			"MMM dd HH:mm:ss yyyy", Locale.US);
+
+	static final Pattern POST_ROW__SOURCE_IPADDR = Pattern
+			.compile("※\\s+来源.*\\[FROM:\\s+([0-9\\.\\*\\:]+)\\]");
+
+	private static Date grepPostRowDate(String header) {
+		String dateText = grepFirstGroup(POST_ROW__DATE, header);
+		try {
+			return POST_ROW__DATE_FORMAT.parse(dateText);
+		} catch (ParseException e) {
+			throw new RuntimeException(e);
+		}
+	}
+
+	private static String removeNbsp(String str) {
+		return str.replace(NBSP, ' ');
+	}
+
+	public ThreadPage getThread(String boardName, int threadId)
+			throws ByrException {
+		return getThread(boardName, threadId, 1);
+	}
+
+	public ThreadPage getThread(String boardName, int threadId, int pageNum) {
+		try {
+			Document doc = fetchDom("http://bbs.byr.cn/article/%s/%d?p=%d",
+					boardName, threadId, pageNum);
+
+			ThreadPage threadPage = new ThreadPage();
+
+			threadPage.setMaxPageNum(selectMaxPageNum(doc));
+
+			for (Object pr : THREAD_PAGE__POST_ROWS.selectNodes(doc)) {
+				PostRow postRow = new PostRow();
+
+				String replyUrl = POST_ROW__REPLY_URL.stringValueOf(doc);
+				int slash = replyUrl.lastIndexOf('/');
+				int postId = Integer.parseInt(replyUrl.substring(slash + 1));
+
+				StringBuilder sb = new StringBuilder();
+				for (Object obj : POST_ROW__CONTENT.selectNodes(pr)) {
+					boolean isBr = false;
+					if (obj instanceof Element) {
+						Element elem = ((Element) obj);
+						if (elem.getNodeName().equalsIgnoreCase("br")) {
+							isBr = true;
+						}
+					}
+
+					if (isBr) {
+						sb.append("\n");
+					} else {
+						sb.append(removeNbsp(((Node) obj).getTextContent())
+								.trim());
+					}
+				}
+
+				String bigContent = sb.toString();
+
+				// split at an empty line;
+				int headerSplitter = bigContent.indexOf("\n\n") + 1;
+
+				String header = bigContent.substring(0, headerSplitter);
+
+				int footerSplitter = bigContent.length();
+
+				for (int i = bigContent.length() - 1; i >= headerSplitter; i--) {
+					if (bigContent.charAt(i) == '※') {
+						if (bigContent.charAt(i - 1) == '\n') {
+							footerSplitter = i;
+						} else {
+							break;
+						}
+					} else if (bigContent.charAt(i) == '\n') {
+						break;
+					}
+				}
+
+				String footer = bigContent.substring(footerSplitter);
+
+				String smallContent = bigContent.substring(headerSplitter,
+						footerSplitter).trim();
+
+				String title = grepFirstGroup(POST_ROW__TITLE, header).trim();
+				Date date = grepPostRowDate(header);
+				String sourceIpAddress = grepFirstGroup(
+						POST_ROW__SOURCE_IPADDR, footer);
+
+				postRow.setPostId(postId);
+				postRow.setTitle(title);
+				postRow.setAuthor(POST_ROW__AUTHOR.stringValueOf(pr));
+				postRow.setContent(smallContent);
+				postRow.setDate(date);
+				postRow.setSourceIpAddress(sourceIpAddress);
+
+				threadPage.getPosts().add(postRow);
+			}
+
+			return threadPage;
+		} catch (Exception e) {
+			throw new ByrException("Error getting thread:" + threadId
+					+ " from board " + boardName, e);
+		}
+	}
 }
