@@ -1,4 +1,4 @@
-package com.github.wks.libbyr4j;
+package com.github.wks.libbyr4j.http;
 
 import java.io.IOException;
 import java.io.InputStream;
