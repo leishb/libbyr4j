@@ -158,7 +158,6 @@ public class Byr {
 
 				threadRow.setThreadId(threadId);
 				threadRow.setTitle(THREAD_ROW__TITLE.stringValueOf(tr));
-				threadRow.setUrl(url);
 				threadRow.setAuthor(THREAD_ROW__AUTHOR.stringValueOf(tr));
 				threadRow.setDate(date);
 				threadRow.setNumReplies(THREAD_ROW__NUM_REPLIES.numberValueOf(
@@ -172,6 +171,5 @@ public class Byr {
 			throw new ByrException("Error getting board:" + boardName, e);
 		}
 	}
-	
 	
 }

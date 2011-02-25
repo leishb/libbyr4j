@@ -8,7 +8,6 @@ import java.util.Date;
 public class ThreadRow {
 	private int threadId;
 	private String title;
-	private String url;
 	private String author;
 	private Date date;
 	private int numReplies;
@@ -27,14 +26,6 @@ public class ThreadRow {
 
 	public void setTitle(String title) {
 		this.title = title;
-	}
-
-	public String getUrl() {
-		return url;
-	}
-
-	public void setUrl(String url) {
-		this.url = url;
 	}
 
 	public String getAuthor() {
