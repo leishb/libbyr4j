@@ -6,6 +6,7 @@ import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.GregorianCalendar;
+import java.util.List;
 import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -301,6 +302,92 @@ public class Byr {
 		} catch (Exception e) {
 			throw new ByrException("Error getting thread:" + threadId
 					+ " from board " + boardName, e);
+		}
+	}
+
+	private static final XPath USER_PAGE__NICK_NAME = mkXPath("//dl[@class='u-info']/dd[1]");
+	private static final XPath USER_PAGE__GENDER = mkXPath("//dl[@class='u-info']/dd[2]");
+	private static final XPath USER_PAGE__ZODIAC = mkXPath("//dl[@class='u-info']/dd[3]");
+	private static final XPath USER_PAGE__QQ = mkXPath("//dl[@class='u-info']/dd[4]");
+	private static final XPath USER_PAGE__MSN = mkXPath("//dl[@class='u-info']/dd[5]");
+	private static final XPath USER_PAGE__HOME_PAGE = mkXPath("//dl[@class='u-info']/dd[6]");
+
+	private static final XPath USER_PAGE__DETAIL_INFO = mkXPath("//dl[@class='u-info u-detail']/*/text()");
+
+	private String weizhiable(String str) {
+		if (str.equals("未知")) {
+			return null;
+		} else {
+			return str;
+		}
+	}
+
+	private static final Pattern INTEGER_PATTERN = Pattern.compile("(\\d+)");
+
+	private static int grepInt(String str) {
+		Matcher m = INTEGER_PATTERN.matcher(str);
+		if (m.find()) {
+			return Integer.parseInt(m.group(1));
+		} else {
+			return -1;
+		}
+	}
+
+	private static Date parseIsoDataFormat(String dateString) {
+		SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+		try {
+			return sdf.parse(dateString);
+		} catch (ParseException e) {
+			return null;
+		}
+	}
+
+	private static boolean parseOnline(String str) {
+		return !str.equals("目前不在线上");
+	}
+
+	public UserPage getUser(String userName) {
+		try {
+			Document doc = fetchDom("http://bbs.byr.cn/user/query/%s", userName);
+
+			UserPage userPage = new UserPage();
+
+			userPage.setUserName(userName);
+			userPage.setNickName(weizhiable(USER_PAGE__NICK_NAME
+					.stringValueOf(doc)));
+			userPage.setGender(weizhiable(USER_PAGE__GENDER.stringValueOf(doc)));
+			userPage.setZodiac(weizhiable(USER_PAGE__ZODIAC.stringValueOf(doc)));
+			userPage.setQq(weizhiable(USER_PAGE__QQ.stringValueOf(doc)));
+			userPage.setMsn(weizhiable(USER_PAGE__MSN.stringValueOf(doc)));
+			userPage.setHomePage(weizhiable(USER_PAGE__HOME_PAGE
+					.stringValueOf(doc)));
+
+			@SuppressWarnings("unchecked")
+			List<Object> details = USER_PAGE__DETAIL_INFO.selectNodes(doc);
+			for (int i = 0; i < details.size()-1; i += 2) {
+				String fieldName = ((Text)details.get(i)).getData();
+				String fieldValue = ((Text)details.get(i+1)).getData();
+				
+				if(fieldName.equals("论坛等级：")) {
+					userPage.setLevel(fieldValue);
+				} else if (fieldName.equals("帖子总数：")) {
+					userPage.setTotalPosts(grepInt(fieldValue));
+				} else if (fieldName.equals("积分：")) {
+					userPage.setScore(Integer.parseInt(fieldValue));
+				} else if (fieldName.equals("生命力：")) {
+					userPage.setLife(Integer.parseInt(fieldValue));
+				} else if (fieldName.equals("上次登录：")) {
+					userPage.setLastLogin(parseIsoDataFormat(fieldValue));
+				} else if (fieldName.equals("最后访问IP：")) {
+					userPage.setLastIpAddress(fieldValue);
+				} else if (fieldName.equals("当前状态：")) {
+					userPage.setOnlineNow(parseOnline(fieldValue));
+				}		
+			}
+
+			return userPage;
+		} catch (Exception e) {
+			throw new ByrException("Error getting user:" + userName, e);
 		}
 	}
 }
